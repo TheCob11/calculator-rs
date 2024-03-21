@@ -1,11 +1,11 @@
 use crate::eval::Number;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOpKind {
-    Pos, // noop
     Neg,
 }
-#[derive(Debug)]
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOpKind {
     Power,
     Multiply,
@@ -13,11 +13,11 @@ pub enum BinaryOpKind {
     Add,
     Subtract,
 }
+
 #[derive(Debug)]
 pub enum Expr {
     // Int(i32), sadge
     Number(Number),
-    Grouping(Box<Expr>),
     UnaryOp(UnaryOpKind, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOpKind, Box<Expr>),
 }
