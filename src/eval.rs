@@ -1,6 +1,6 @@
 use num::traits::Pow;
 
-use crate::ast::*;
+use crate::ast::{BinaryOpKind, Expr, UnaryOpKind};
 
 pub type Number = f64;
 
@@ -22,6 +22,7 @@ impl Expr {
     fn eval_unary_op(kind: UnaryOpKind, expr: Expr) -> Number {
         let x = expr.eval();
         match kind {
+            UnaryOpKind::Plus => x,
             UnaryOpKind::Neg => -x,
         }
     }
@@ -42,44 +43,53 @@ impl Expr {
 mod tests {
     use super::*;
 
+    #[allow(clippy::float_cmp)]
+    fn test_eval(expr: Expr, val: Number) {
+        assert_eq!(expr.eval(), val);
+    }
+
     #[test]
     fn one_plus_one_eq_two() {
-        let expr = Expr::BinaryOp(
-            Box::new(Expr::Number(1.)),
-            BinaryOpKind::Add,
-            Box::new(Expr::Number(1.)),
+        test_eval(
+            Expr::BinaryOp(
+                Box::new(Expr::Number(1.)),
+                BinaryOpKind::Add,
+                Box::new(Expr::Number(1.)),
+            ),
+            2.,
         );
-        println!("{expr:?}");
-        assert_eq!(expr.eval(), 2.)
     }
 
     #[test]
     fn two_times_four_eq_eight() {
-        let expr = Expr::BinaryOp(
+        test_eval(Expr::BinaryOp(
             Box::new(Expr::Number(2.)),
             BinaryOpKind::Multiply,
             Box::new(Expr::Number(4.)),
-        );
-        println!("{expr:?}");
-        assert_eq!(expr.eval(), 8.);
+        ), 8.);
     }
 
+    fn bin_op_numbers(lhs: Number, kind: BinaryOpKind, rhs: Number) -> Expr {
+        Expr::BinaryOp(
+            Box::new(Expr::Number(lhs)),
+            kind,
+            Box::new(Expr::Number(rhs)),
+        )
+    }
     #[test]
     fn two_times_neg_three_eq_five_times_two_minus_eight_times_two() {
-        let expr_a = Expr::bin_op_numbers(2., BinaryOpKind::Multiply, -3.);
+        let expr_a = bin_op_numbers(2., BinaryOpKind::Multiply, -3.);
         let expr_b = Expr::BinaryOp(
-            Box::new(Expr::bin_op_numbers(5., BinaryOpKind::Multiply, 2.)),
+            Box::new(bin_op_numbers(5., BinaryOpKind::Multiply, 2.)),
             BinaryOpKind::Subtract,
-            Box::new(Expr::bin_op_numbers(8., BinaryOpKind::Multiply, 2.)),
+            Box::new(bin_op_numbers(8., BinaryOpKind::Multiply, 2.)),
         );
-        println!("{expr_a:#?} \n=?\n {expr_b:#?}");
-        assert_eq!(expr_a.eval(), expr_b.eval())
+        // println!("{expr_a:#?} \n=?\n {expr_b:#?}");
+        test_eval(expr_a, expr_b.eval());
     }
 
     #[test]
     fn divide_by_zero() {
-        let expr = Expr::bin_op_numbers(5., BinaryOpKind::Divide, 0.);
-        println!("{expr:?} <---- clueless");
-        assert_eq!(expr.eval(), f64::INFINITY)
+        test_eval(bin_op_numbers(5., BinaryOpKind::Divide, 0.), Number::INFINITY);
     }
 }
