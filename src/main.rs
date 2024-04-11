@@ -1,27 +1,43 @@
-use std::io::{BufRead, stdin, stdout, Write};
+use std::io::{stdin, stdout, BufRead, Write};
 
-use calculator::calc_parts;
+use calculator::lex::Lexer;
+use calculator::Expr;
 
 fn main() -> std::io::Result<()> {
     let mut stdout = stdout().lock();
-    print!(">> ");
-    stdout.flush()?;
-    for line in stdin().lock().lines() {
-        let input = line?;
-        if let "q" | "quit" | "exit" = input.to_lowercase().trim() {
-            return Ok(());
-        }
-        match calc_parts(&input) {
-            Ok((lex, expr, out)) => {
-                let toks = lex.collect::<Result<Vec<_>, _>>().unwrap();
-                println!("tokens: {toks:?}");
-                println!("ast: {expr:?}");
-                println!("evaluation: {out}");
-            }
-            Err(err) => eprintln!("Error: {err}"),
-        }
+    let mut lines = stdin().lock().lines();
+    loop {
         print!(">> ");
         stdout.flush()?;
-    };
+        let input = match lines.next() {
+            Some(x) => x?,
+            None => break,
+        };
+        if let "q" | "quit" | "exit" = input.to_lowercase().trim() {
+            break;
+        }
+        let lex = Lexer::new(&input);
+        match lex.clone().collect::<Result<Vec<_>, _>>() {
+            Ok(x) => println!("tokens: {x:?}"),
+            Err(e) => {
+                eprintln!("Lexing Error: {e}");
+                continue;
+            }
+        };
+        let expr = match Expr::try_from(lex) {
+            Ok(x) => {
+                println!("ast: {x:#?}");
+                x
+            }
+            Err(e) => {
+                eprintln!("Parsing Error: {e}");
+                continue;
+            }
+        };
+        match expr.eval() {
+            Ok(x) => println!("Evaluation: {x}"),
+            Err(e) => eprintln!("Evaluation Error: {e}"),
+        }
+    }
     Ok(())
 }

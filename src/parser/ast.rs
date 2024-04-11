@@ -15,10 +15,14 @@ pub enum BinaryOpKind {
     Subtract,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub enum Expr {
-    // Int(i32), sadge
     Number(Number),
+    Id(Identifier),
     UnaryOp(UnaryOpKind, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOpKind, Box<Expr>),
+    Call(Identifier, Vec<Expr>),
 }
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Identifier(pub String);
