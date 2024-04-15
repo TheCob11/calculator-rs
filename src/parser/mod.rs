@@ -30,11 +30,15 @@ pub enum Error {
     GoneTooSoon,
     #[error("Unexpected trailing input after end of expression: '{0:?}'")]
     TrailingToken(Vec<Result<Token, LexError>>),
-    #[error("Parenthesis multiplication not supported")] //todo? it messes w/ order of ops
+    #[error("Implicit multiplication with parenthesis not supported")]
+    //todo? it messes w/ order of ops
     ImplicitMul,
 }
 
-fn handle_expect(tok: &Token, lex: &mut Peekable<Lexer>) -> Result<(), Error> {
+fn handle_expect(
+    tok: &Token,
+    lex: &mut Peekable<impl Iterator<Item = Result<Token, LexError>>>,
+) -> Result<(), Error> {
     if let Token::Group(kind, GroupEnd::Open) = tok {
         match lex.next().transpose()? {
             Some(Token::Group(other_kind, GroupEnd::Close)) if other_kind.eq(kind) => {}
@@ -44,7 +48,10 @@ fn handle_expect(tok: &Token, lex: &mut Peekable<Lexer>) -> Result<(), Error> {
     Ok(())
 }
 
-fn parse_step(lex: &mut Peekable<Lexer>, curr_power: BindingPower) -> Result<Expr, Error> {
+fn parse_step(
+    lex: &mut Peekable<impl Iterator<Item = Result<Token, LexError>>>,
+    curr_power: BindingPower,
+) -> Result<Expr, Error> {
     use crate::lex::token::Token as T;
     use Error as PErr;
     use Expr as E;
@@ -64,32 +71,46 @@ fn parse_step(lex: &mut Peekable<Lexer>, curr_power: BindingPower) -> Result<Exp
             }
         }
     };
-    loop {
-        if !match lex.peek() {
-            // this is not great
-            Some(Ok(tok)) => tok.infix_power().is_some_and(|(l, _)| curr_power < l),
-            Some(Err(_)) => return Err(PErr::LexingError(lex.next().unwrap().unwrap_err())),
-            None => false,
-        } {
-            break;
-        }
-        // these can be unwrapped bc they were just checked on peek
-        let tok = lex.next().unwrap().unwrap();
-        let (_, r_power) = tok.infix_power().unwrap();
-        let rhs = parse_step(lex, r_power)?;
-        handle_expect(&tok, lex)?;
+    while let Some(Ok(tok)) = lex.next_if(|res| {
+        res.as_ref().is_ok_and(|tok| {
+            tok.infix_power()
+                .is_some_and(|(left_power, _)| curr_power < left_power)
+        })
+    }) {
+        let (_, r_power) = tok
+            .infix_power()
+            .expect("should have been checked on the next_if");
         lhs = if let T::Group(GroupKind::Paren, GroupEnd::Open) = tok {
-            if let Expr::Id(id) = lhs {
-                // todo multi arg fns
-                E::Call(id, vec![rhs])
-            } else {
+            let Expr::Id(func) = lhs else {
                 return Err(PErr::ImplicitMul);
-            }
+            };
+            E::Call(func, parse_args(lex, r_power)?)
         } else {
+            let rhs = parse_step(lex, r_power)?;
+            handle_expect(&tok, lex)?;
             E::BinaryOp(Box::new(lhs), tok.try_into()?, Box::new(rhs))
         }
     }
     Ok(lhs)
+}
+
+fn parse_args(
+    lex: &mut Peekable<impl Iterator<Item = Result<Token, LexError>>>,
+    r_power: BindingPower,
+) -> Result<Vec<Expr>, Error> {
+    let mut args = Vec::new();
+    while lex
+        .peek()
+        .is_some_and(|res| !matches!(res, Ok(Token::Group(GroupKind::Paren, GroupEnd::Close))))
+    {
+        args.push(parse_step(lex, r_power)?);
+        lex.next_if(|res| matches!(res, Ok(Token::Comma)));
+    }
+    let Some(Token::Group(GroupKind::Paren, GroupEnd::Close)) = lex.next().transpose()? else {
+        return Err(Error::UnclosedGroup(GroupKind::Paren));
+    };
+
+    Ok(args)
 }
 
 impl Expr {
@@ -132,7 +153,9 @@ impl TryFrom<Token> for UnaryOpKind {
         Ok(match tok {
             T::Plus => UnaryOpKind::Plus,
             T::Minus => UnaryOpKind::Neg,
-            tok => return Err(BadUnOp(tok)),
+            T::Group(_, _) | T::Comma | T::Pow | T::Mul | T::Div | T::Number(_) | T::Id(_) => {
+                return Err(BadUnOp(tok))
+            }
         })
     }
 }
@@ -152,7 +175,7 @@ impl TryFrom<Token> for BinaryOpKind {
             T::Div => K::Divide,
             T::Plus => K::Add,
             T::Minus => K::Subtract,
-            tok => return Err(BadBinOp(tok)),
+            T::Group(_, _) | T::Comma | T::Number(_) | T::Id(_) => return Err(BadBinOp(tok)),
         })
     }
 }
@@ -168,7 +191,7 @@ impl Token {
             T::Mul | T::Div => (8, 9),
             T::Plus | T::Minus => (6, 7),
             T::Group(_, GroupEnd::Open) => (BindingPower::MAX, BindingPower::MIN),
-            _ => return None,
+            T::Number(_) | T::Id(_) | T::Group(_, GroupEnd::Close) | T::Comma => return None,
         })
     }
     #[must_use]
@@ -177,7 +200,9 @@ impl Token {
         Some(match &self {
             T::Plus | T::Minus => 10,
             T::Number(_) | T::Id(_) | T::Group(_, GroupEnd::Open) => 0,
-            _ => return None,
+            Token::Pow | Token::Mul | Token::Div | T::Group(_, GroupEnd::Close) | T::Comma => {
+                return None
+            }
         })
     }
 }

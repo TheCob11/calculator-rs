@@ -17,6 +17,7 @@ pub enum GroupKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Group(GroupKind, GroupEnd),
+    Comma,
     Pow,
     Mul,
     Div,
@@ -35,12 +36,13 @@ pub enum LexErrorKind {
 }
 
 impl Token {
-    const PREFIXES: [(Self, &'static str); 11] = {
+    const PREFIXES: [(Self, &'static str); 12] = {
         use Token as T;
         [
             (T::Number(Number::INFINITY), "∞"), // lol
             (T::Group(GroupKind::Paren, GroupEnd::Open), "("),
             (T::Group(GroupKind::Paren, GroupEnd::Close), ")"),
+            (T::Comma, ","),
             (T::Pow, "**"),
             (T::Mul, "*"),
             (T::Mul, "×"),

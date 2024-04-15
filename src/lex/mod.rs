@@ -19,6 +19,16 @@ impl Lexer {
         s.retain(|c| !c.is_whitespace());
         Self(s, 0)
     }
+
+    #[must_use]
+    pub fn pos(&self) -> usize {
+        self.1
+    }
+
+    #[must_use]
+    pub fn src(&self) -> &str {
+        &self.0
+    }
 }
 
 #[derive(Error, Debug, Clone)]

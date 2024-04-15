@@ -35,8 +35,5 @@ fn neg_neg_neg_neg_five_plus_three_pow_two_over_fifteen() {
 
 #[test]
 fn sin_three_times_whole_four_plus_ln_six_over_two() {
-    test_calc(
-        "sin(3*(4+ln(6/2)))",
-        <f64>::sin(3. * (4. + <f64>::ln(6. / 2.))),
-    );
+    test_calc("sin(3*(4+ln(6/2)))", (3. * (4. + (6. / 2f64).ln())).sin());
 }
