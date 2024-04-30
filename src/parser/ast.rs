@@ -26,3 +26,9 @@ pub enum Expr {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Identifier(pub String);
+
+impl From<&str> for Identifier {
+    fn from(value: &str) -> Self {
+        Identifier(value.to_string())
+    }
+}

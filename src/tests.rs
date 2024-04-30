@@ -1,8 +1,9 @@
 //noinspection RsLiveness (rustrover bug doesnt realize that panic fmt uses error)
 #[allow(clippy::float_cmp)]
 fn test_calc(s: &str, ans: crate::eval::Number) {
+    let mut ctx = crate::Context::new();
     match s.parse::<crate::parser::ast::Expr>() {
-        Ok(expr) => match expr.eval() {
+        Ok(expr) => match ctx.eval(&expr) {
             Ok(eval) => assert_eq!(eval, ans),
             Err(e) => panic!("Eval error: {e}"),
         },

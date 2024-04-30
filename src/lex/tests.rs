@@ -1,6 +1,5 @@
 use crate::lex::token::Token::*;
 use crate::lex::token::{GroupEnd, GroupKind};
-use crate::parser::ast::Identifier;
 
 use super::*;
 
@@ -88,10 +87,7 @@ fn five_dot_three_pow_four_cross_two_times_five() {
 
 #[test]
 fn x_plus_one() {
-    test_lexing(
-        "x+1",
-        &[Id(Identifier(String::from("x"))), Plus, Number(1.)],
-    );
+    test_lexing("x+1", &[Id("x".into()), Plus, Number(1.)]);
 }
 
 #[test]
@@ -99,7 +95,7 @@ fn sin_five() {
     test_lexing(
         "sin(5)",
         &[
-            Id(Identifier(String::from("sin"))),
+            Id("sin".into()),
             Group(GroupKind::Paren, GroupEnd::Open),
             Number(5.),
             Group(GroupKind::Paren, GroupEnd::Close),

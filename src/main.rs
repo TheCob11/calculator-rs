@@ -6,6 +6,7 @@ use calculator::Expr;
 fn main() -> std::io::Result<()> {
     let mut stdout = stdout().lock();
     let mut lines = stdin().lock().lines();
+    let mut ctx = calculator::Context::new();
     loop {
         print!(">> ");
         stdout.flush()?;
@@ -34,7 +35,7 @@ fn main() -> std::io::Result<()> {
                 continue;
             }
         };
-        match expr.eval() {
+        match ctx.eval(&expr) {
             Ok(x) => println!("Evaluation: {x}"),
             Err(e) => eprintln!("Evaluation Error: {e}"),
         }

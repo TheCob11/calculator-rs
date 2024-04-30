@@ -3,6 +3,7 @@
 
 use thiserror::Error;
 
+pub use eval::Context;
 pub use eval::Error as EvalError;
 pub use eval::Number;
 pub use parser::ast::Expr;
@@ -21,7 +22,7 @@ pub enum Error {
 }
 
 pub fn calc(s: &str) -> Result<Number, Error> {
-    Ok(s.parse::<Expr>()?.eval()?)
+    Ok(Context::new().eval(&s.parse::<Expr>()?)?)
 }
 
 #[cfg(test)]

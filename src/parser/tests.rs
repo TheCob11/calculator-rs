@@ -1,7 +1,6 @@
 use super::ast::{
     BinaryOpKind::*,
     Expr::{self, *},
-    Identifier,
     UnaryOpKind::*,
 };
 
@@ -67,10 +66,10 @@ fn five_plus_exp_sin_2_times_3_over_four() {
             b(Number(5.)),
             Add,
             b(Call(
-                Identifier(String::from("exp")),
+                "exp".into(),
                 vec![BinaryOp(
                     b(Call(
-                        Identifier(String::from("sin")),
+                        "sin".into(),
                         vec![BinaryOp(b(Number(2.)), Multiply, b(Number(3.)))],
                     )),
                     Divide,
@@ -83,11 +82,5 @@ fn five_plus_exp_sin_2_times_3_over_four() {
 
 #[test]
 fn max_one_two() {
-    test_parse(
-        "max(1,2)",
-        Call(
-            Identifier(String::from("max")),
-            vec![Number(1.), Number(2.)],
-        ),
-    );
+    test_parse("max(1,2)", Call("max".into(), vec![Number(1.), Number(2.)]));
 }

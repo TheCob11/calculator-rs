@@ -2,14 +2,21 @@ use super::*;
 
 #[allow(clippy::float_cmp)]
 fn test_eval(expr: Expr, val: Number) {
-    assert_eq!(expr.eval().unwrap_or_else(|err| panic!("{err}")), val);
+    let mut ctx = Context::new();
+    assert_eq!(ctx.eval(&expr).unwrap_or_else(|err| panic!("{err}")), val);
 }
 
 #[allow(clippy::float_cmp)]
 fn test_eval_both_sides(lhs: Expr, rhs: Expr) {
-    let val_lhs = lhs.eval().unwrap_or_else(|err| panic!("{err}"));
-    let val_rhs = rhs.eval().unwrap_or_else(|err| panic!("{err}"));
+    let mut ctx = Context::new();
+    let val_lhs = ctx.eval(&lhs).unwrap_or_else(|err| panic!("{err}"));
+    let val_rhs = ctx.eval(&rhs).unwrap_or_else(|err| panic!("{err}"));
     assert_eq!(val_lhs, val_rhs);
+}
+
+#[allow(clippy::float_cmp)]
+fn test_eval_ctx(ctx: &mut Context, expr: Expr, val: Number) {
+    assert_eq!(ctx.eval(&expr).unwrap_or_else(|err| panic!("{err}")), val);
 }
 
 #[test]
@@ -62,4 +69,24 @@ fn divide_by_zero() {
         bin_op_numbers(5., BinaryOpKind::Divide, 0.),
         Number::INFINITY,
     );
+}
+
+#[test]
+fn custom_func() {
+    let mut ctx = Context::new();
+    let add_one_id: Identifier = "add_one".into();
+    let x_id: Identifier = "x".into();
+    ctx.fns.insert(
+        add_one_id.clone(),
+        UserFunction {
+            arg_names: vec![x_id.clone()],
+            body: Expr::BinaryOp(
+                Box::new(Expr::Id(x_id)),
+                BinaryOpKind::Add,
+                Box::new(Expr::Number(1.)),
+            ),
+        },
+    );
+    let call_expr = Expr::Call(add_one_id, vec![Expr::Number(4.)]);
+    test_eval_ctx(&mut ctx, call_expr, 5.);
 }
