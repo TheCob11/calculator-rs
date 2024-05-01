@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::eval::Number;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,13 +24,15 @@ pub enum Expr {
     UnaryOp(UnaryOpKind, Box<Expr>),
     BinaryOp(Box<Expr>, BinaryOpKind, Box<Expr>),
     Call(Identifier, Vec<Expr>),
+    VarAssign(Identifier, Box<Expr>),
+    FnDef(Identifier, Rc<[Identifier]>, Rc<Expr>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Identifier(pub String);
+pub struct Identifier(std::sync::Arc<str>);
 
 impl From<&str> for Identifier {
     fn from(value: &str) -> Self {
-        Identifier(value.to_string())
+        Identifier(value.into())
     }
 }

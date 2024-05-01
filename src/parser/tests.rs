@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use super::ast::{
     BinaryOpKind::*,
     Expr::{self, *},
@@ -83,4 +85,21 @@ fn five_plus_exp_sin_2_times_3_over_four() {
 #[test]
 fn max_one_two() {
     test_parse("max(1,2)", Call("max".into(), vec![Number(1.), Number(2.)]));
+}
+
+#[test]
+fn x_eq_three() {
+    test_parse("x=3", VarAssign("x".into(), b(Number(3.))));
+}
+
+#[test]
+fn f_of_x_eq_two_times_x() {
+    test_parse(
+        "f(x)=2*x",
+        FnDef(
+            "f".into(),
+            Rc::new(["x".into()]),
+            Rc::new(BinaryOp(b(Number(2.)), Multiply, b(Id("x".into())))),
+        ),
+    );
 }

@@ -25,6 +25,7 @@ pub enum Token {
     Minus,
     Number(Number),
     Id(Identifier),
+    Equals,
 }
 
 #[derive(Error, Debug, Copy, Clone)]
@@ -36,12 +37,13 @@ pub enum LexErrorKind {
 }
 
 impl Token {
-    const PREFIXES: [(Self, &'static str); 12] = {
+    const PREFIXES: [(Self, &'static str); 13] = {
         use Token as T;
         [
             (T::Number(Number::INFINITY), "∞"), // lol
             (T::Group(GroupKind::Paren, GroupEnd::Open), "("),
             (T::Group(GroupKind::Paren, GroupEnd::Close), ")"),
+            (T::Equals, "="),
             (T::Comma, ","),
             (T::Pow, "**"),
             (T::Mul, "*"),
@@ -85,9 +87,8 @@ impl Identifier {
     fn eat(input: &str) -> (Self, usize) {
         let ident = input
             .split_once(|c: char| !c.is_alphanumeric())
-            .map_or(input, |(left, _)| left)
-            .to_string();
+            .map_or(input, |(left, _)| left);
         let len = ident.len();
-        (Self(ident), len)
+        (ident.into(), len)
     }
 }

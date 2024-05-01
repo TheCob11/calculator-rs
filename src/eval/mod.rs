@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use num::traits::Pow;
 use thiserror::Error;
@@ -15,11 +16,19 @@ pub type Number = f64;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Undefined variable {0:?}")]
-    UndefinedVar(Identifier), //todo?
+    UndefinedVar(Identifier),
     #[error("Unrecognized function {0:?}")]
     UnrecognizedFunction(Identifier),
     #[error(transparent)]
     WrongNArgs(#[from] WrongNArgs),
+    #[error("Can't override builtin symbol {0:?}")]
+    BuiltinOverride(Identifier),
+    #[error("Cant use {0:?} as a parameter because it is a builtin symbol")]
+    BuiltinParam(Identifier),
+    #[error("{0:?} is a variable and can not be called")]
+    VarNotFunc(Identifier),
+    #[error("{0:?} is a function and must be called")]
+    FuncNotVar(Identifier),
 }
 
 #[derive(Error, Debug)]
@@ -27,8 +36,8 @@ pub enum Error {
 pub struct WrongNArgs(usize, usize);
 
 pub struct UserFunction {
-    arg_names: Vec<Identifier>,
-    body: Expr,
+    arg_names: Rc<[Identifier]>,
+    body: Rc<Expr>,
 }
 
 impl UserFunction {
@@ -39,13 +48,32 @@ impl UserFunction {
         let bindings_to_return = self
             .arg_names
             .iter()
-            .cloned()
             .zip(args)
-            .filter_map(|(id, val)| ctx.vars.insert(id.clone(), val).map(|x| (id, x)))
+            .map(|(id, val)| {
+                let prev;
+                if let Some(x) = ctx.vars.get_mut(id) {
+                    (prev, *x) = (Some(*x), val);
+                } else {
+                    prev = None;
+                    ctx.vars.insert(id.clone(), val);
+                }
+                (id, prev)
+            })
             .collect::<Vec<_>>();
-        let res = ctx.eval(&self.body)?;
-        ctx.vars.extend(bindings_to_return);
-        Ok(res)
+        let res = ctx.eval(&self.body);
+        for (id, prev) in bindings_to_return {
+            match prev {
+                Some(x) => {
+                    *ctx.vars
+                        .get_mut(id)
+                        .expect("Saved bindings before call should have been bound for call") = x;
+                }
+                None => {
+                    ctx.vars.remove(id);
+                }
+            }
+        }
+        res
     }
 }
 
@@ -64,16 +92,21 @@ impl Context {
     }
 
     pub fn eval(&mut self, expr: &Expr) -> Result<Number, Error> {
-        Ok(match expr {
-            Expr::Number(x) => *x,
-            Expr::UnaryOp(kind, expr) => self.eval_unary_op(*kind, expr)?,
-            Expr::BinaryOp(expr_l, kind, expr_r) => self.eval_binary_op(expr_l, *kind, expr_r)?,
-            Expr::Call(id, expr) => self.eval_call(id.clone(), expr)?,
-            Expr::Id(id) => *builtins::BUILTIN_CONSTS
+        match expr {
+            Expr::Number(x) => Ok(*x),
+            Expr::UnaryOp(kind, expr) => self.eval_unary_op(*kind, expr),
+            Expr::BinaryOp(expr_l, kind, expr_r) => self.eval_binary_op(expr_l, *kind, expr_r),
+            Expr::Call(id, expr) => self.eval_call(id.clone(), expr),
+            Expr::Id(id) => builtins::BUILTIN_CONSTS
                 .get(id)
                 .or_else(|| self.vars.get(id))
-                .ok_or_else(|| Error::UndefinedVar(id.clone()))?,
-        })
+                .ok_or_else(|| Error::UndefinedVar(id.clone()))
+                .copied(),
+            Expr::VarAssign(id, body) => self.eval_var_assign(id.clone(), body),
+            Expr::FnDef(id, arg_names, body) => {
+                self.eval_fn_def(id.clone(), arg_names.to_owned(), body.to_owned())
+            }
+        }
     }
 
     fn eval_unary_op(&mut self, kind: UnaryOpKind, expr: &Expr) -> Result<Number, Error> {
@@ -111,10 +144,43 @@ impl Context {
             let Some(f) = self.fns.remove(&id) else {
                 return Err(Error::UnrecognizedFunction(id));
             };
-            let res = f.call(self, args)?;
+            let res = f.call(self, args);
             self.fns.insert(id, f);
-            res
+            res?
         })
+    }
+
+    fn eval_var_assign(&mut self, id: Identifier, body: &Expr) -> Result<Number, Error> {
+        if Self::is_builtin(&id) {
+            return Err(Error::BuiltinOverride(id));
+        }
+        self.fns.remove(&id);
+        let val = self.eval(body)?;
+        self.vars.insert(id, val);
+        Ok(val)
+    }
+
+    fn eval_fn_def(
+        &mut self,
+        id: Identifier,
+        arg_names: Rc<[Identifier]>,
+        body: Rc<Expr>,
+    ) -> Result<Number, Error> {
+        if Self::is_builtin(&id) {
+            return Err(Error::BuiltinOverride(id));
+        }
+        if let Some(id) = arg_names.iter().find(|x| Self::is_builtin(x)) {
+            return Err(Error::BuiltinParam(id.clone()));
+        }
+        self.vars.remove(&id);
+        self.fns.insert(id, UserFunction { arg_names, body });
+        // todo should this return a new value type?
+        Ok(1.)
+    }
+
+    #[inline]
+    fn is_builtin(id: &Identifier) -> bool {
+        builtins::BUILTIN_FNS.contains_key(id) || builtins::BUILTIN_CONSTS.contains_key(id)
     }
 }
 

@@ -102,3 +102,25 @@ fn sin_five() {
         ],
     );
 }
+
+#[test]
+fn x_equals_three() {
+    test_lexing("x=3", &[Id("x".into()), Equals, Number(3.)]);
+}
+
+#[test]
+fn f_of_x_equals_two_times_x() {
+    test_lexing(
+        "f(x)=2*x",
+        &[
+            Id("f".into()),
+            Group(GroupKind::Paren, GroupEnd::Open),
+            Id("x".into()),
+            Group(GroupKind::Paren, GroupEnd::Close),
+            Equals,
+            Number(2.),
+            Mul,
+            Id("x".into()),
+        ],
+    );
+}

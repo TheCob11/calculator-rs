@@ -1,4 +1,5 @@
 use std::iter::Peekable;
+use std::rc::Rc;
 use std::str::FromStr;
 
 use thiserror::Error;
@@ -7,6 +8,7 @@ use ast::{BinaryOpKind, Expr, UnaryOpKind};
 
 use crate::lex::token::{GroupEnd, GroupKind, Token};
 use crate::lex::{Error as LexError, Lexer};
+use crate::parser::ast::Identifier;
 
 pub mod ast;
 #[cfg(test)]
@@ -33,6 +35,10 @@ pub enum Error {
     #[error("Implicit multiplication with parenthesis not supported")]
     //todo? it messes w/ order of ops
     ImplicitMul,
+    #[error("Function parameters must be variables, but function {0:?} has parameter {1:?}")]
+    FnParamExpr(Identifier, Expr),
+    #[error("Can only assign to variables or functions, not {0:?}")]
+    BadAssign(Expr),
 }
 
 fn handle_expect(
@@ -85,6 +91,22 @@ fn parse_step(
                 return Err(PErr::ImplicitMul);
             };
             E::Call(func, parse_args(lex, r_power)?)
+        } else if let T::Equals = tok {
+            match lhs {
+                Expr::Id(id) => Expr::VarAssign(id, Box::new(parse_step(lex, r_power)?)),
+                Expr::Call(f, args) => {
+                    let arg_names = match args
+                        .into_iter()
+                        .map(|x| if let Expr::Id(id) = x { Ok(id) } else { Err(x) })
+                        .collect::<Result<_, _>>()
+                    {
+                        Ok(x) => x,
+                        Err(x) => return Err(Error::FnParamExpr(f, x)),
+                    };
+                    E::FnDef(f, arg_names, Rc::new(parse_step(lex, r_power)?))
+                }
+                x => return Err(Error::BadAssign(x)),
+            }
         } else {
             let rhs = parse_step(lex, r_power)?;
             handle_expect(&tok, lex)?;
@@ -153,9 +175,14 @@ impl TryFrom<Token> for UnaryOpKind {
         Ok(match tok {
             T::Plus => UnaryOpKind::Plus,
             T::Minus => UnaryOpKind::Neg,
-            T::Group(_, _) | T::Comma | T::Pow | T::Mul | T::Div | T::Number(_) | T::Id(_) => {
-                return Err(BadUnOp(tok))
-            }
+            T::Group(_, _)
+            | T::Comma
+            | T::Equals
+            | T::Pow
+            | T::Mul
+            | T::Div
+            | T::Number(_)
+            | T::Id(_) => return Err(BadUnOp(tok)),
         })
     }
 }
@@ -175,7 +202,9 @@ impl TryFrom<Token> for BinaryOpKind {
             T::Div => K::Divide,
             T::Plus => K::Add,
             T::Minus => K::Subtract,
-            T::Group(_, _) | T::Comma | T::Number(_) | T::Id(_) => return Err(BadBinOp(tok)),
+            T::Group(_, _) | T::Comma | T::Equals | T::Number(_) | T::Id(_) => {
+                return Err(BadBinOp(tok))
+            }
         })
     }
 }
@@ -191,6 +220,7 @@ impl Token {
             T::Mul | T::Div => (8, 9),
             T::Plus | T::Minus => (6, 7),
             T::Group(_, GroupEnd::Open) => (BindingPower::MAX, BindingPower::MIN),
+            T::Equals => (1, 1),
             T::Number(_) | T::Id(_) | T::Group(_, GroupEnd::Close) | T::Comma => return None,
         })
     }
@@ -200,9 +230,12 @@ impl Token {
         Some(match &self {
             T::Plus | T::Minus => 10,
             T::Number(_) | T::Id(_) | T::Group(_, GroupEnd::Open) => 0,
-            Token::Pow | Token::Mul | Token::Div | T::Group(_, GroupEnd::Close) | T::Comma => {
-                return None
-            }
+            Token::Pow
+            | Token::Mul
+            | Token::Div
+            | T::Group(_, GroupEnd::Close)
+            | T::Comma
+            | T::Equals => return None,
         })
     }
 }

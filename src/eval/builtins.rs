@@ -66,6 +66,7 @@ impl From<fn(Vec<Number>) -> Result<Number, WrongNArgs>> for BuiltInFunction {
     }
 }
 
+//noinspection SpellCheckingInspection
 #[allow(clippy::cast_precision_loss)]
 pub static BUILTIN_FNS: Lazy<HashMap<Identifier, BuiltInFunction>> = Lazy::new(|| {
     use BuiltInFunction::{Binary as Bi, Nullary as Nul, Unary as Un, Variadic};
