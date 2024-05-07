@@ -107,7 +107,7 @@ impl Value {
 
     fn expr_with_args(self) -> (PExpr, Option<Vec<Identifier>>) {
         match self {
-            Value::Num(x) => (Expr::Number(x).into(), None),
+            Value::Num(x) => (Expr::Num(x).into(), None),
             Value::Func(UserFunction { arg_names, body }) => (body, Some(arg_names)),
         }
     }
@@ -137,7 +137,7 @@ impl Context {
 
     pub fn eval(&mut self, expr: &Expr) -> Res {
         match expr {
-            Expr::Number(x) => Ok(Value::Num(*x)),
+            Expr::Num(x) => Ok(Value::Num(*x)),
             Expr::UnaryOp(kind, expr) => self.eval_unary_op(*kind, expr),
             Expr::BinaryOp(expr_l, kind, expr_r) => self.eval_binary_op(expr_l, *kind, expr_r),
             Expr::Call(lhs, expr) => self.eval_call(lhs, expr),

@@ -66,7 +66,7 @@ fn parse_step(
     use Error as PErr;
     use Expr as E;
     let mut lhs = match lex.next().ok_or(PErr::GoneTooSoon)?? {
-        T::Number(x) => E::Number(x),
+        T::Number(x) => E::Num(x),
         T::Id(x) => E::Id(x),
         tok => {
             let Some(pre_power) = tok.prefix_power() else {

@@ -20,7 +20,7 @@ pub type PExpr = std::rc::Rc<Expr>;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    Number(Number),
+    Num(Number),
     Id(Identifier),
     UnaryOp(UnaryOpKind, PExpr),
     BinaryOp(PExpr, BinaryOpKind, PExpr),

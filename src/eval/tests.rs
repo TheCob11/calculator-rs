@@ -29,7 +29,7 @@ fn test_eval_ctx(ctx: &mut Context, expr: &Expr, val: impl Into<Value>) -> Res {
 #[test]
 fn one_plus_one_eq_two() -> Res {
     test_eval(
-        &BinaryOp(Number(1.).into(), BinaryOpKind::Add, Number(1.).into()),
+        &BinaryOp(Num(1.).into(), BinaryOpKind::Add, Num(1.).into()),
         2.,
     )
 }
@@ -37,13 +37,13 @@ fn one_plus_one_eq_two() -> Res {
 #[test]
 fn two_times_four_eq_eight() -> Res {
     test_eval(
-        &BinaryOp(Number(2.).into(), BinaryOpKind::Multiply, Number(4.).into()),
+        &BinaryOp(Num(2.).into(), BinaryOpKind::Multiply, Num(4.).into()),
         8.,
     )
 }
 
 fn bin_op_numbers(lhs: super::Number, kind: BinaryOpKind, rhs: super::Number) -> Expr {
-    BinaryOp(Number(lhs).into(), kind, Number(rhs).into())
+    BinaryOp(Num(lhs).into(), kind, Num(rhs).into())
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn x_eq_three_minus_e() -> Res {
         &mut ctx,
         &VarAssign(
             "x".into(),
-            BinaryOp(Number(3.).into(), BinaryOpKind::Multiply, Number(2.).into()).into(),
+            BinaryOp(Num(3.).into(), BinaryOpKind::Multiply, Num(2.).into()).into(),
         ),
         3. * 2.,
     )?;
@@ -86,8 +86,7 @@ fn custom_func_add_one() -> Res {
     let add_one_id: Identifier = "add_one".into();
     let x_id: Identifier = "x".into();
     let add_one_args = vec![x_id.clone()];
-    let add_one_body: PExpr =
-        BinaryOp(Id(x_id).into(), BinaryOpKind::Add, Number(1.).into()).into();
+    let add_one_body: PExpr = BinaryOp(Id(x_id).into(), BinaryOpKind::Add, Num(1.).into()).into();
     test_eval_ctx(
         &mut ctx,
         &VarAssign(
@@ -99,7 +98,7 @@ fn custom_func_add_one() -> Res {
             body: add_one_body,
         }),
     )?;
-    let call_expr = Call(Id(add_one_id).into(), vec![Number(4.).into()]);
+    let call_expr = Call(Id(add_one_id).into(), vec![Num(4.).into()]);
     test_eval_ctx(&mut ctx, &call_expr, 5.)
 }
 
@@ -109,18 +108,17 @@ fn one_plus_custom_func_add_one() -> Res {
     let add_one_id: Identifier = "add_one".into();
     let x_id: Identifier = "x".into();
     let arg_names = vec![x_id.clone()];
-    let add_one_body: PExpr =
-        BinaryOp(Id(x_id).into(), BinaryOpKind::Add, Number(1.).into()).into();
+    let add_one_body: PExpr = BinaryOp(Id(x_id).into(), BinaryOpKind::Add, Num(1.).into()).into();
     ctx.eval(&VarAssign(
         add_one_id.clone(),
         FnDef(arg_names.clone(), add_one_body.clone()).into(),
     ))?;
     test_eval_ctx(
         &mut ctx,
-        &BinaryOp(Number(1.).into(), BinaryOpKind::Add, Id(add_one_id).into()),
+        &BinaryOp(Num(1.).into(), BinaryOpKind::Add, Id(add_one_id).into()),
         Value::Func(UserFunction {
             arg_names,
-            body: BinaryOp(Number(1.).into(), BinaryOpKind::Add, add_one_body).into(),
+            body: BinaryOp(Num(1.).into(), BinaryOpKind::Add, add_one_body).into(),
         }),
     )
 }

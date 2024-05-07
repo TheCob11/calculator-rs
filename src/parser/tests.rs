@@ -21,7 +21,7 @@ fn test_parse(s: &str, expected: Expr) -> Result<(), super::Error> {
 
 #[test]
 fn one_plus_one() -> Res {
-    test_parse("1+1", BinaryOp(p(Number(1.)), Add, p(Number(1.))))
+    test_parse("1+1", BinaryOp(p(Num(1.)), Add, p(Num(1.))))
 }
 
 #[test]
@@ -29,9 +29,9 @@ fn two_plus_four_pow_three_div_five() -> Res {
     test_parse(
         "     (2+ 4) * * (3  ÷5)",
         BinaryOp(
-            p(BinaryOp(p(Number(2.)), Add, p(Number(4.)))),
+            p(BinaryOp(p(Num(2.)), Add, p(Num(4.)))),
             Power,
-            p(BinaryOp(p(Number(3.)), Divide, p(Number(5.)))),
+            p(BinaryOp(p(Num(3.)), Divide, p(Num(5.)))),
         ),
     )
 }
@@ -43,9 +43,9 @@ fn neg_whole_two_div_whole_one_plus_one() -> Res {
         UnaryOp(
             Neg,
             p(BinaryOp(
-                p(Number(2.)),
+                p(Num(2.)),
                 Divide,
-                p(BinaryOp(p(Number(1.)), Add, p(Number(1.)))),
+                p(BinaryOp(p(Num(1.)), Add, p(Num(1.)))),
             )),
         ),
     )
@@ -55,7 +55,7 @@ fn neg_whole_two_div_whole_one_plus_one() -> Res {
 fn neg_one_whole_squared() -> Res {
     test_parse(
         "(-1)**2",
-        BinaryOp(p(UnaryOp(Neg, p(Number(1.)))), Power, p(Number(2.))),
+        BinaryOp(p(UnaryOp(Neg, p(Num(1.)))), Power, p(Num(2.))),
     )
 }
 
@@ -64,17 +64,17 @@ fn five_plus_exp_sin_2_times_3_over_four() -> Res {
     test_parse(
         "5+exp(sin(2*3)/4)",
         BinaryOp(
-            p(Number(5.)),
+            p(Num(5.)),
             Add,
             p(Call(
                 Id("exp".into()).into(),
                 vec![BinaryOp(
                     p(Call(
                         Id("sin".into()).into(),
-                        vec![BinaryOp(p(Number(2.)), Multiply, p(Number(3.))).into()],
+                        vec![BinaryOp(p(Num(2.)), Multiply, p(Num(3.))).into()],
                     )),
                     Divide,
-                    p(Number(4.)),
+                    p(Num(4.)),
                 )
                 .into()],
             )),
@@ -88,14 +88,14 @@ fn max_one_two() -> Res {
         "max(1,2)",
         Call(
             Id("max".into()).into(),
-            vec![Number(1.).into(), Number(2.).into()],
+            vec![Num(1.).into(), Num(2.).into()],
         ),
     )
 }
 
 #[test]
 fn x_eq_three() -> Res {
-    test_parse("x=3", VarAssign("x".into(), p(Number(3.))))
+    test_parse("x=3", VarAssign("x".into(), p(Num(3.))))
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn f_of_x_eq_two_times_x() -> Res {
             "f".into(),
             FnDef(
                 ["x".into()].into(),
-                Rc::new(BinaryOp(p(Number(2.)), Multiply, p(Id("x".into())))),
+                Rc::new(BinaryOp(p(Num(2.)), Multiply, p(Id("x".into())))),
             )
             .into(),
         ),
