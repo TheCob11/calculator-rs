@@ -8,7 +8,7 @@ use ast::{BinaryOpKind, Expr, UnaryOpKind};
 
 use crate::lex::token::{GroupEnd, GroupKind, Token};
 use crate::lex::{Error as LexError, Lexer};
-use crate::parser::ast::Identifier;
+use crate::parser::ast::{Identifier, PExpr};
 
 pub mod ast;
 #[cfg(test)]
@@ -32,13 +32,17 @@ pub enum Error {
     GoneTooSoon,
     #[error("Unexpected trailing input after end of expression: '{0:?}'")]
     TrailingToken(Vec<Result<Token, LexError>>),
-    #[error("Implicit multiplication with parenthesis not supported")]
+    // #[error("Implicit multiplication with parenthesis not supported")]
     //todo? it messes w/ order of ops
-    ImplicitMul,
-    #[error("Function parameters must be variables, but function {0:?} has parameter {1:?}")]
-    FnParamExpr(Identifier, Expr),
+    // ImplicitMul,
+    #[error(
+        "Function parameters must be defined as variables, but function {0:?} has parameter {1:?}"
+    )]
+    FnDefParamExpr(Identifier, PExpr),
+    #[error("Function definitions can only be assigned to identifiers, not {0:?}")]
+    FnDefIdExpr(PExpr),
     #[error("Can only assign to variables or functions, not {0:?}")]
-    BadAssign(Expr),
+    BadAssign(PExpr),
 }
 
 fn handle_expect(
@@ -73,7 +77,7 @@ fn parse_step(
             if let T::Group(_, GroupEnd::Open) = tok {
                 rhs
             } else {
-                E::UnaryOp(tok.try_into()?, Box::new(rhs))
+                E::UnaryOp(tok.try_into()?, rhs.into())
             }
         }
     };
@@ -87,30 +91,42 @@ fn parse_step(
             .infix_power()
             .expect("should have been checked on the next_if");
         lhs = if let T::Group(GroupKind::Paren, GroupEnd::Open) = tok {
-            let Expr::Id(func) = lhs else {
-                return Err(PErr::ImplicitMul);
-            };
-            E::Call(func, parse_args(lex, r_power)?)
+            // let Expr::Id(func) = lhs else {
+            //     return Err(PErr::ImplicitMul);
+            // };
+            E::Call(lhs.into(), parse_args(lex, r_power)?)
         } else if let T::Equals = tok {
             match lhs {
-                Expr::Id(id) => Expr::VarAssign(id, Box::new(parse_step(lex, r_power)?)),
+                Expr::Id(id) => Expr::VarAssign(id, parse_step(lex, r_power)?.into()),
                 Expr::Call(f, args) => {
+                    let f = Rc::into_inner(f)
+                        .expect("Exprs shouldn't have multiple references during parsing");
+                    let Expr::Id(id) = f else {
+                        return Err(Error::FnDefIdExpr(f.into()));
+                    };
                     let arg_names = match args
                         .into_iter()
-                        .map(|x| if let Expr::Id(id) = x { Ok(id) } else { Err(x) })
+                        .map(|x| {
+                            if let Expr::Id(id) = x.as_ref() {
+                                Ok(id.clone())
+                            } else {
+                                Err(x)
+                            }
+                        })
                         .collect::<Result<_, _>>()
                     {
                         Ok(x) => x,
-                        Err(x) => return Err(Error::FnParamExpr(f, x)),
+                        Err(x) => return Err(Error::FnDefParamExpr(id, x)),
                     };
-                    E::FnDef(f, arg_names, Rc::new(parse_step(lex, r_power)?))
+                    let def_expr = E::FnDef(arg_names, parse_step(lex, r_power)?.into());
+                    E::VarAssign(id, def_expr.into())
                 }
-                x => return Err(Error::BadAssign(x)),
+                x => return Err(Error::BadAssign(x.into())),
             }
         } else {
             let rhs = parse_step(lex, r_power)?;
             handle_expect(&tok, lex)?;
-            E::BinaryOp(Box::new(lhs), tok.try_into()?, Box::new(rhs))
+            E::BinaryOp(lhs.into(), tok.try_into()?, rhs.into())
         }
     }
     Ok(lhs)
@@ -119,13 +135,13 @@ fn parse_step(
 fn parse_args(
     lex: &mut Peekable<impl Iterator<Item = Result<Token, LexError>>>,
     r_power: BindingPower,
-) -> Result<Vec<Expr>, Error> {
+) -> Result<Vec<PExpr>, Error> {
     let mut args = Vec::new();
     while lex
         .peek()
         .is_some_and(|res| !matches!(res, Ok(Token::Group(GroupKind::Paren, GroupEnd::Close))))
     {
-        args.push(parse_step(lex, r_power)?);
+        args.push(parse_step(lex, r_power)?.into());
         lex.next_if(|res| matches!(res, Ok(Token::Comma)));
     }
     let Some(Token::Group(GroupKind::Paren, GroupEnd::Close)) = lex.next().transpose()? else {

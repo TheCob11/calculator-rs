@@ -3,33 +3,33 @@ use crate::lex::token::{GroupEnd, GroupKind};
 
 use super::*;
 
+type Res = Result<(), super::Error>;
+
 //noinspection RsLiveness (rustrover bug doesnt realize that panic fmt uses error)
-fn test_lexing(s: &str, expected_toks: &[Token]) {
-    let toks = Lexer::new(s).collect::<Result<Vec<_>, _>>();
+fn test_lexing(s: &str, expected_toks: &[Token]) -> Res {
+    let toks = Lexer::new(s).collect::<Result<Vec<_>, _>>()?;
     // println!("{s} --> {toks:?}");
-    match toks {
-        Ok(x) => assert_eq!(x, expected_toks),
-        Err(x) => panic!("{x}"),
-    }
+    assert_eq!(expected_toks, toks);
+    Ok(())
 }
 
 #[test]
-fn one_plus_one() {
+fn one_plus_one() -> Res {
     const TOKS_1P1: &[Token] = &[Number(1.), Plus, Number(1.)];
-    test_lexing("1+1", TOKS_1P1);
-    test_lexing("1 + 1", TOKS_1P1);
-    test_lexing(" 1 + 1", TOKS_1P1);
-    test_lexing("1    +1", TOKS_1P1);
-    test_lexing(" 1 + 1         ", TOKS_1P1);
+    test_lexing("1+1", TOKS_1P1)?;
+    test_lexing("1 + 1", TOKS_1P1)?;
+    test_lexing(" 1 + 1", TOKS_1P1)?;
+    test_lexing("1    +1", TOKS_1P1)?;
+    test_lexing(" 1 + 1         ", TOKS_1P1)
 }
 
 #[test]
-fn two_plus_four_times_eight() {
-    test_lexing("2+4*8", &[Number(2.), Plus, Number(4.), Mul, Number(8.)]);
+fn two_plus_four_times_eight() -> Res {
+    test_lexing("2+4*8", &[Number(2.), Plus, Number(4.), Mul, Number(8.)])
 }
 
 #[test]
-fn five_point_four_pow_three_times_2_over_9() {
+fn five_point_four_pow_three_times_2_over_9() -> Res {
     test_lexing(
         "(5.4**3)*2/9",
         &[
@@ -43,16 +43,16 @@ fn five_point_four_pow_three_times_2_over_9() {
             Div,
             Number(9.),
         ],
-    );
+    )
 }
 
 #[test]
-fn five_cross_three() {
-    test_lexing("5×3", &[Number(5.), Mul, Number(3.)]);
+fn five_cross_three() -> Res {
+    test_lexing("5×3", &[Number(5.), Mul, Number(3.)])
 }
 
 #[test]
-fn five_div_three_pow_two_cross_two_point_two() {
+fn five_div_three_pow_two_cross_two_point_two() -> Res {
     test_lexing(
         "5÷3**2×2.2",
         &[
@@ -64,11 +64,11 @@ fn five_div_three_pow_two_cross_two_point_two() {
             Mul,
             Number(2.2),
         ],
-    );
+    )
 }
 
 #[test]
-fn five_dot_three_pow_four_cross_two_times_five() {
+fn five_dot_three_pow_four_cross_two_times_five() -> Res {
     test_lexing(
         "5∙3**4×2*5",
         &[
@@ -82,16 +82,16 @@ fn five_dot_three_pow_four_cross_two_times_five() {
             Mul,
             Number(5.),
         ],
-    );
+    )
 }
 
 #[test]
-fn x_plus_one() {
-    test_lexing("x+1", &[Id("x".into()), Plus, Number(1.)]);
+fn x_plus_one() -> Res {
+    test_lexing("x+1", &[Id("x".into()), Plus, Number(1.)])
 }
 
 #[test]
-fn sin_five() {
+fn sin_five() -> Res {
     test_lexing(
         "sin(5)",
         &[
@@ -100,16 +100,16 @@ fn sin_five() {
             Number(5.),
             Group(GroupKind::Paren, GroupEnd::Close),
         ],
-    );
+    )
 }
 
 #[test]
-fn x_equals_three() {
-    test_lexing("x=3", &[Id("x".into()), Equals, Number(3.)]);
+fn x_equals_three() -> Res {
+    test_lexing("x=3", &[Id("x".into()), Equals, Number(3.)])
 }
 
 #[test]
-fn f_of_x_equals_two_times_x() {
+fn f_of_x_equals_two_times_x() -> Res {
     test_lexing(
         "f(x)=2*x",
         &[
@@ -122,5 +122,5 @@ fn f_of_x_equals_two_times_x() {
             Mul,
             Id("x".into()),
         ],
-    );
+    )
 }

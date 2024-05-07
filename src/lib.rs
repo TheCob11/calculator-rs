@@ -9,6 +9,8 @@ pub use eval::Number;
 pub use parser::ast::Expr;
 pub use parser::Error as ParseError;
 
+pub use crate::eval::Value;
+
 pub mod eval;
 pub mod lex;
 pub mod parser;
@@ -21,7 +23,7 @@ pub enum Error {
     ParseError(#[from] parser::Error),
 }
 
-pub fn calc(s: &str) -> Result<Number, Error> {
+pub fn calc(s: &str) -> Result<Value, Error> {
     Ok(Context::new().eval(&s.parse::<Expr>()?)?)
 }
 

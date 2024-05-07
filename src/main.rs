@@ -36,7 +36,7 @@ fn main() -> std::io::Result<()> {
             }
         };
         match ctx.eval(&expr) {
-            Ok(x) => println!("Evaluation: {x}"),
+            Ok(x) => println!("Evaluation: {x:#?}"),
             Err(e) => eprintln!("Evaluation Error: {e}"),
         }
     }

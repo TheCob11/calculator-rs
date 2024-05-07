@@ -1,11 +1,13 @@
+use Expr::*;
+
 use super::*;
 
 type Res = Result<(), Error>;
 
 #[allow(clippy::float_cmp)]
-fn test_eval(expr: &Expr, val: Number) -> Res {
+fn test_eval(expr: &Expr, val: impl Into<Value>) -> Res {
     let mut ctx = Context::new();
-    assert_eq!(ctx.eval(expr)?, val);
+    assert_eq!(ctx.eval(expr)?, val.into());
     Ok(())
 }
 
@@ -19,19 +21,15 @@ fn test_eval_both_sides(lhs: &Expr, rhs: &Expr) -> Res {
 }
 
 #[allow(clippy::float_cmp)]
-fn test_eval_ctx(ctx: &mut Context, expr: &Expr, val: Number) -> Res {
-    assert_eq!(ctx.eval(expr)?, val);
+fn test_eval_ctx(ctx: &mut Context, expr: &Expr, val: impl Into<Value>) -> Res {
+    assert_eq!(ctx.eval(expr)?, val.into());
     Ok(())
 }
 
 #[test]
 fn one_plus_one_eq_two() -> Res {
     test_eval(
-        &Expr::BinaryOp(
-            Box::new(Expr::Number(1.)),
-            BinaryOpKind::Add,
-            Box::new(Expr::Number(1.)),
-        ),
+        &BinaryOp(Number(1.).into(), BinaryOpKind::Add, Number(1.).into()),
         2.,
     )
 }
@@ -39,31 +37,23 @@ fn one_plus_one_eq_two() -> Res {
 #[test]
 fn two_times_four_eq_eight() -> Res {
     test_eval(
-        &Expr::BinaryOp(
-            Box::new(Expr::Number(2.)),
-            BinaryOpKind::Multiply,
-            Box::new(Expr::Number(4.)),
-        ),
+        &BinaryOp(Number(2.).into(), BinaryOpKind::Multiply, Number(4.).into()),
         8.,
     )
 }
 
-fn bin_op_numbers(lhs: Number, kind: BinaryOpKind, rhs: Number) -> Expr {
-    Expr::BinaryOp(
-        Box::new(Expr::Number(lhs)),
-        kind,
-        Box::new(Expr::Number(rhs)),
-    )
+fn bin_op_numbers(lhs: super::Number, kind: BinaryOpKind, rhs: super::Number) -> Expr {
+    BinaryOp(Number(lhs).into(), kind, Number(rhs).into())
 }
 
 #[test]
 fn two_times_neg_three_eq_five_times_two_minus_eight_times_two() -> Res {
     test_eval_both_sides(
         &bin_op_numbers(2., BinaryOpKind::Multiply, -3.),
-        &Expr::BinaryOp(
-            Box::new(bin_op_numbers(5., BinaryOpKind::Multiply, 2.)),
+        &BinaryOp(
+            bin_op_numbers(5., BinaryOpKind::Multiply, 2.).into(),
             BinaryOpKind::Subtract,
-            Box::new(bin_op_numbers(8., BinaryOpKind::Multiply, 2.)),
+            bin_op_numbers(8., BinaryOpKind::Multiply, 2.).into(),
         ),
     )
 }
@@ -72,7 +62,7 @@ fn two_times_neg_three_eq_five_times_two_minus_eight_times_two() -> Res {
 fn divide_by_zero() -> Res {
     test_eval(
         &bin_op_numbers(5., BinaryOpKind::Divide, 0.),
-        Number::INFINITY,
+        super::Number::INFINITY,
     )
 }
 
@@ -81,17 +71,13 @@ fn x_eq_three_minus_e() -> Res {
     let mut ctx = Context::new();
     test_eval_ctx(
         &mut ctx,
-        &Expr::VarAssign(
+        &VarAssign(
             "x".into(),
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::Number(3.)),
-                BinaryOpKind::Multiply,
-                Box::new(Expr::Number(2.)),
-            )),
+            BinaryOp(Number(3.).into(), BinaryOpKind::Multiply, Number(2.).into()).into(),
         ),
         3. * 2.,
     )?;
-    test_eval_ctx(&mut ctx, &Expr::Id("x".into()), 3. * 2.)
+    test_eval_ctx(&mut ctx, &Id("x".into()), 3. * 2.)
 }
 
 #[test]
@@ -99,19 +85,42 @@ fn custom_func_add_one() -> Res {
     let mut ctx = Context::new();
     let add_one_id: Identifier = "add_one".into();
     let x_id: Identifier = "x".into();
+    let add_one_args = vec![x_id.clone()];
+    let add_one_body: PExpr =
+        BinaryOp(Id(x_id).into(), BinaryOpKind::Add, Number(1.).into()).into();
     test_eval_ctx(
         &mut ctx,
-        &Expr::FnDef(
+        &VarAssign(
             add_one_id.clone(),
-            Rc::new([x_id.clone()]),
-            Rc::new(Expr::BinaryOp(
-                Box::new(Expr::Id(x_id)),
-                BinaryOpKind::Add,
-                Box::new(Expr::Number(1.)),
-            )),
+            FnDef(add_one_args.clone(), add_one_body.clone()).into(),
         ),
-        1.,
+        Value::Func(UserFunction {
+            arg_names: add_one_args,
+            body: add_one_body,
+        }),
     )?;
-    let call_expr = Expr::Call(add_one_id, vec![Expr::Number(4.)]);
+    let call_expr = Call(Id(add_one_id).into(), vec![Number(4.).into()]);
     test_eval_ctx(&mut ctx, &call_expr, 5.)
+}
+
+#[test]
+fn one_plus_custom_func_add_one() -> Res {
+    let mut ctx = Context::new();
+    let add_one_id: Identifier = "add_one".into();
+    let x_id: Identifier = "x".into();
+    let arg_names = vec![x_id.clone()];
+    let add_one_body: PExpr =
+        BinaryOp(Id(x_id).into(), BinaryOpKind::Add, Number(1.).into()).into();
+    ctx.eval(&VarAssign(
+        add_one_id.clone(),
+        FnDef(arg_names.clone(), add_one_body.clone()).into(),
+    ))?;
+    test_eval_ctx(
+        &mut ctx,
+        &BinaryOp(Number(1.).into(), BinaryOpKind::Add, Id(add_one_id).into()),
+        Value::Func(UserFunction {
+            arg_names,
+            body: BinaryOp(Number(1.).into(), BinaryOpKind::Add, add_one_body).into(),
+        }),
+    )
 }

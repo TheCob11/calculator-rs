@@ -7,99 +7,108 @@ use super::ast::{
 };
 
 #[allow(clippy::unnecessary_box_returns)]
-fn b<T>(x: T) -> Box<T> {
-    Box::new(x)
+fn p(x: Expr) -> super::ast::PExpr {
+    x.into()
 }
+type Res = Result<(), super::Error>;
 
 //noinspection RsLiveness (rustrover bug doesnt realize that panic fmt uses error)
 #[allow(clippy::needless_pass_by_value)]
-fn test_parse(s: &str, expected: Expr) {
-    match s.parse::<Expr>() {
-        Ok(expr) => assert_eq!(expr, expected),
-        Err(e) => panic!("{e}"),
-    }
+fn test_parse(s: &str, expected: Expr) -> Result<(), super::Error> {
+    assert_eq!(expected, s.parse()?);
+    Ok(())
 }
 
 #[test]
-fn one_plus_one() {
-    test_parse("1+1", BinaryOp(b(Number(1.)), Add, b(Number(1.))));
+fn one_plus_one() -> Res {
+    test_parse("1+1", BinaryOp(p(Number(1.)), Add, p(Number(1.))))
 }
 
 #[test]
-fn two_plus_four_pow_three_div_five() {
+fn two_plus_four_pow_three_div_five() -> Res {
     test_parse(
         "     (2+ 4) * * (3  ÷5)",
         BinaryOp(
-            b(BinaryOp(b(Number(2.)), Add, b(Number(4.)))),
+            p(BinaryOp(p(Number(2.)), Add, p(Number(4.)))),
             Power,
-            b(BinaryOp(b(Number(3.)), Divide, b(Number(5.)))),
+            p(BinaryOp(p(Number(3.)), Divide, p(Number(5.)))),
         ),
-    );
+    )
 }
 
 #[test]
-fn neg_whole_two_div_whole_one_plus_one() {
+fn neg_whole_two_div_whole_one_plus_one() -> Res {
     test_parse(
         "-(2/(1+1))",
         UnaryOp(
             Neg,
-            b(BinaryOp(
-                b(Number(2.)),
+            p(BinaryOp(
+                p(Number(2.)),
                 Divide,
-                b(BinaryOp(b(Number(1.)), Add, b(Number(1.)))),
+                p(BinaryOp(p(Number(1.)), Add, p(Number(1.)))),
             )),
         ),
-    );
+    )
 }
 
 #[test]
-fn neg_one_whole_squared() {
+fn neg_one_whole_squared() -> Res {
     test_parse(
         "(-1)**2",
-        BinaryOp(b(UnaryOp(Neg, b(Number(1.)))), Power, b(Number(2.))),
-    );
+        BinaryOp(p(UnaryOp(Neg, p(Number(1.)))), Power, p(Number(2.))),
+    )
 }
 
 #[test]
-fn five_plus_exp_sin_2_times_3_over_four() {
+fn five_plus_exp_sin_2_times_3_over_four() -> Res {
     test_parse(
         "5+exp(sin(2*3)/4)",
         BinaryOp(
-            b(Number(5.)),
+            p(Number(5.)),
             Add,
-            b(Call(
-                "exp".into(),
+            p(Call(
+                Id("exp".into()).into(),
                 vec![BinaryOp(
-                    b(Call(
-                        "sin".into(),
-                        vec![BinaryOp(b(Number(2.)), Multiply, b(Number(3.)))],
+                    p(Call(
+                        Id("sin".into()).into(),
+                        vec![BinaryOp(p(Number(2.)), Multiply, p(Number(3.))).into()],
                     )),
                     Divide,
-                    b(Number(4.)),
-                )],
+                    p(Number(4.)),
+                )
+                .into()],
             )),
         ),
-    );
+    )
 }
 
 #[test]
-fn max_one_two() {
-    test_parse("max(1,2)", Call("max".into(), vec![Number(1.), Number(2.)]));
+fn max_one_two() -> Res {
+    test_parse(
+        "max(1,2)",
+        Call(
+            Id("max".into()).into(),
+            vec![Number(1.).into(), Number(2.).into()],
+        ),
+    )
 }
 
 #[test]
-fn x_eq_three() {
-    test_parse("x=3", VarAssign("x".into(), b(Number(3.))));
+fn x_eq_three() -> Res {
+    test_parse("x=3", VarAssign("x".into(), p(Number(3.))))
 }
 
 #[test]
-fn f_of_x_eq_two_times_x() {
+fn f_of_x_eq_two_times_x() -> Res {
     test_parse(
         "f(x)=2*x",
-        FnDef(
+        VarAssign(
             "f".into(),
-            Rc::new(["x".into()]),
-            Rc::new(BinaryOp(b(Number(2.)), Multiply, b(Id("x".into())))),
+            FnDef(
+                ["x".into()].into(),
+                Rc::new(BinaryOp(p(Number(2.)), Multiply, p(Id("x".into())))),
+            )
+            .into(),
         ),
-    );
+    )
 }
