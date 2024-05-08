@@ -86,7 +86,7 @@ impl Token {
 impl Identifier {
     fn eat(input: &str) -> (Self, usize) {
         let ident = input
-            .split_once(|c: char| !c.is_alphanumeric())
+            .split_once(|c: char| !(c.is_alphanumeric() || c == '_'))
             .map_or(input, |(left, _)| left);
         let len = ident.len();
         (ident.into(), len)
