@@ -79,7 +79,7 @@ pub static BUILTIN_FNS: Lazy<HashMap<Identifier, BuiltInFunction>> = Lazy::new(|
     add("acos", Un(N::acos));
     add("tan", Un(N::tan));
     add("atan", Un(N::atan));
-    add("atan2", Bi(f64::atan2));
+    add("atan2", Bi(N::atan2));
     add("sqrt", Un(N::sqrt));
     add("cbrt", Un(N::cbrt));
     add("nrt", Bi(|n, x| x.powf(n.recip())));

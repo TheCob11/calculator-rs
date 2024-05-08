@@ -141,10 +141,7 @@ impl Context {
             Expr::UnaryOp(kind, expr) => self.eval_unary_op(*kind, expr),
             Expr::BinaryOp(expr_l, kind, expr_r) => self.eval_binary_op(expr_l, *kind, expr_r),
             Expr::Call(lhs, expr) => self.eval_call(lhs, expr),
-            Expr::Id(id) => builtins::BUILTIN_CONSTS
-                .get(id)
-                .map_or_else(|| self.syms.get(id).cloned(), |&x| Some(Value::Num(x)))
-                .ok_or_else(|| Error::UndefinedVar(id.clone())),
+            Expr::Id(id) => self.eval_id(id),
             Expr::VarAssign(id, body) => self.eval_var_assign(id.clone(), body),
             Expr::FnDef(arg_names, body) => self.eval_fn_def(arg_names.clone(), body.clone()),
         }
@@ -193,29 +190,65 @@ impl Context {
             .map(|x| self.eval(x))
             .collect::<Result<_, _>>()?;
         if let Expr::Id(id) = lhs {
-            Ok(if let Some(f) = builtins::BUILTIN_FNS.get(id) {
+            if let Some(f) = builtins::BUILTIN_FNS.get(id) {
                 if let Some(nums) = args.iter().map(|val| val.num().copied()).collect() {
-                    Value::Num(f.call(nums)?)
+                    Ok(Value::Num(f.call(nums)?))
                 } else {
                     let (bodies, args): (Vec<PExpr>, Vec<Option<Vec<Identifier>>>) =
                         args.into_iter().map(Value::expr_with_args).unzip();
-                    Value::Func(UserFunction {
+                    Ok(Value::Func(UserFunction {
                         arg_names: args.into_iter().flatten().flatten().collect(),
                         body: Expr::Call(Expr::Id(id.clone()).into(), bodies).into(),
-                    })
+                    }))
                 }
             } else {
                 let Some(Value::Func(f)) = self.syms.get(id).cloned() else {
                     return Err(Error::UnrecognizedFunction(id.clone()));
                 };
-                f.call(self, args)?
-            })
+                f.call(self, args)
+            }
         } else {
             match self.eval(lhs)? {
                 Value::Func(f) => f.call(self, args),
                 Value::Num(x) => Err(Error::ImplicitMul(x)),
             }
         }
+    }
+
+    fn eval_id(&mut self, id: &Identifier) -> Res {
+        Ok(
+            if let Some(val) = builtins::BUILTIN_CONSTS
+                .get(id)
+                .map_or_else(|| self.syms.get(id).cloned(), |&x| Some(Value::Num(x)))
+            {
+                val
+            } else if let Some(f) = builtins::BUILTIN_FNS.get(id) {
+                use builtins::BuiltInFunction as F;
+                let arg_names = match f {
+                    F::Nullary(_) => vec![],
+                    F::Unary(_) => vec!["_builtin_arg_0".into()],
+                    F::Binary(_) => vec!["_builtin_arg_0".into(), "_builtin_arg_1".into()],
+                    F::Variadic(_) => {
+                        eprintln!("variadic function {id:?} defaulting to two arguments");
+                        vec!["_builtin_arg_0".into(), "_builtin_arg_1".into()]
+                    }
+                };
+                Value::Func(UserFunction {
+                    arg_names: arg_names.clone(),
+                    body: Expr::Call(
+                        Expr::Id(id.clone()).into(),
+                        arg_names
+                            .into_iter()
+                            .map(Expr::Id)
+                            .map(PExpr::from)
+                            .collect(),
+                    )
+                    .into(),
+                })
+            } else {
+                return Err(Error::UndefinedVar(id.clone()));
+            },
+        )
     }
 
     fn eval_var_assign(&mut self, id: Identifier, body: &Expr) -> Res {
